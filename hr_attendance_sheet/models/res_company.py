@@ -11,7 +11,7 @@ from odoo import api, fields, models
 class ResCompany(models.Model):
     _inherit = "res.company"
 
-    use_attendance_sheets = fields.Boolean("Use Attendance Sheets", default=False)
+    use_attendance_sheets = fields.Boolean(default=False)
     attendance_sheet_range = fields.Selection(
         selection=[
             ("MONTHLY", "Month"),
@@ -19,43 +19,59 @@ class ResCompany(models.Model):
             ("WEEKLY", "Week"),
             ("DAILY", "Day"),
         ],
-        string="Attendance Sheet Range",
         default="WEEKLY",
         help="The range of your Attendance Sheet.",
     )
-
-    @api.onchange("attendance_sheet_range")
-    def onchange_attendance_sheet_range(self):
-        if self.attendance_sheet_range == "MONTHLY":
-            self._origin.write({"date_start": datetime.today().date().replace(day=1)})
 
     date_start = fields.Date(
         string="Date From", index=True, default=datetime.today().date()
     )
     date_end = fields.Date(string="Date To", readonly=True, index=True)
 
-    def set_date_end(self, company):
+    def get_date_end(self, company, range=None, date_start=None):
         company = self.browse(company)
-        if company.date_start:
-            if company.attendance_sheet_range == "WEEKLY":
-                return company.date_start + relativedelta(days=6)
-            elif company.attendance_sheet_range == "BIWEEKLY":
-                return company.date_start + relativedelta(days=13)
-            else:
-                return company.date_start + relativedelta(months=1, day=1, days=-1)
+        if not range:
+            range = company.attendance_sheet_range
+        if not date_start:
+            date_start = company.date_start
 
-    def write(self, vals):
-        res = super().write(vals)
-        if vals.get("date_start") or vals.get("attendance_sheet_range"):
-            vals.update({"date_end": self.set_date_end(company=self.id)})
-        return res
+        if isinstance(date_start, str):
+            date_start = datetime.strptime(date_start, "%Y-%m-%d")
+
+        if range == "WEEKLY":
+            return date_start + relativedelta(days=6)
+        elif range == "BIWEEKLY":
+            return date_start + relativedelta(days=13)
+        else:
+            return date_start + relativedelta(months=1, day=1, days=-1)
 
     @api.model
     def create(self, vals):
         res = super().create(vals)
         if vals.get("date_start"):
-            res.write({"date_end": self.set_date_end(res.id)})
+            res.write(
+                {
+                    "date_end": self.get_date_end(
+                        self.id,
+                        vals.get("attendance_sheet_range"),
+                        vals.get("date_start"),
+                    )
+                }
+            )
         return res
+
+    def write(self, vals):
+        if vals.get("date_start") or vals.get("attendance_sheet_range"):
+            vals.update(
+                {
+                    "date_end": self.get_date_end(
+                        self.id,
+                        vals.get("attendance_sheet_range"),
+                        vals.get("date_start"),
+                    )
+                }
+            )
+        return super().write(vals)
 
     attendance_week_start = fields.Selection(
         selection=[
@@ -72,7 +88,6 @@ class ResCompany(models.Model):
     )
 
     attendance_sheet_review_policy = fields.Selection(
-        string="Attendance Sheet Review Policy",
         selection=[
             ("hr", "HR Manager/Officer"),
             ("employee_manager", "Employee's Manager or Attendance Admin"),
@@ -83,7 +98,6 @@ class ResCompany(models.Model):
     )
 
     auto_lunch = fields.Boolean(
-        string="Auto Lunch",
         help="Applies a lunch period if duration is over the max time.",
     )
 

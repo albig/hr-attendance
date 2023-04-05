@@ -15,7 +15,7 @@ class HrAttendanceSheet(models.Model):
     _description = "Attendance Sheet"
     _inherit = ["mail.thread", "mail.activity.mixin"]
 
-    active = fields.Boolean(string="Active", default=True)
+    active = fields.Boolean(default=True)
     name = fields.Char(compute="_compute_name")
     employee_id = fields.Many2one("hr.employee", string="Employee", required=True)
     user_id = fields.Many2one(
@@ -63,12 +63,12 @@ class HrAttendanceSheet(models.Model):
     total_time = fields.Float(compute="_compute_total_time", store=True)
     overtime = fields.Float(compute="_compute_overtime", store=True)
     can_review = fields.Boolean(
-        string="Can Review", compute="_compute_can_review", search="_search_can_review"
+        compute="_compute_can_review", search="_search_can_review"
     )
     reviewer_id = fields.Many2one(
         "hr.employee", string="Reviewer", readonly=True, tracking=True
     )
-    reviewed_on = fields.Datetime(string="Reviewed On", readonly=True)
+    reviewed_on = fields.Datetime(readonly=True)
     review_policy = fields.Selection(
         string="Review Policy", related="company_id.attendance_sheet_review_policy"
     )
@@ -160,7 +160,11 @@ must be set on the Company %s"
         for company_id in companies:
             if company_id.date_end and datetime.today().date() > company_id.date_end:
                 company_id.date_start = company_id.date_end + relativedelta(days=1)
-                company_id.set_date_end(company_id.id)
+                company_id.date_end = company_id.get_date_end(
+                    company_id.id,
+                    company_id.attendance_sheet_range,
+                    company_id.date_start,
+                )
 
     # Compute Methods
     @api.depends("employee_id", "date_start", "date_end")
