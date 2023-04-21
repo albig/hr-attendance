@@ -30,10 +30,8 @@ class ResCompany(models.Model):
 
     def get_date_end(self, company, range=None, date_start=None):
         company = self.browse(company)
-        if not range:
-            range = company.attendance_sheet_range
-        if not date_start:
-            date_start = company.date_start
+        range = range or company.attendance_sheet_range
+        date_start = date_start or company.date_start
 
         if isinstance(date_start, str):
             date_start = datetime.strptime(date_start, "%Y-%m-%d")
