@@ -23,38 +23,53 @@ class ResCompany(models.Model):
         help="The range of your Attendance Sheet.",
     )
 
-    @api.onchange("attendance_sheet_range")
-    def onchange_attendance_sheet_range(self):
-        if self.attendance_sheet_range == "MONTHLY":
-            self._origin.write({"date_start": datetime.today().date().replace(day=1)})
-
     date_start = fields.Date(
         string="Date From", index=True, default=datetime.today().date()
     )
     date_end = fields.Date(string="Date To", readonly=True, index=True)
 
-    def set_date_end(self, company):
+    def get_date_end(self, company, range=None, date_start=None):
         company = self.browse(company)
-        if company.date_start:
-            if company.attendance_sheet_range == "WEEKLY":
-                return company.date_start + relativedelta(days=6)
-            elif company.attendance_sheet_range == "BIWEEKLY":
-                return company.date_start + relativedelta(days=13)
-            else:
-                return company.date_start + relativedelta(months=1, day=1, days=-1)
+        range = range or company.attendance_sheet_range
+        date_start = date_start or company.date_start
 
-    def write(self, vals):
-        res = super().write(vals)
-        if vals.get("date_start") or vals.get("attendance_sheet_range"):
-            vals.update({"date_end": self.set_date_end(company=self.id)})
-        return res
+        if isinstance(date_start, str):
+            date_start = datetime.strptime(date_start, "%Y-%m-%d")
+
+        if range == "WEEKLY":
+            return date_start + relativedelta(days=6)
+        elif range == "BIWEEKLY":
+            return date_start + relativedelta(days=13)
+        else:
+            return date_start + relativedelta(months=1, day=1, days=-1)
 
     @api.model
     def create(self, vals):
         res = super().create(vals)
         if vals.get("date_start"):
-            res.write({"date_end": self.set_date_end(res.id)})
+            res.write(
+                {
+                    "date_end": self.get_date_end(
+                        self.id,
+                        vals.get("attendance_sheet_range"),
+                        vals.get("date_start"),
+                    )
+                }
+            )
         return res
+
+    def write(self, vals):
+        if vals.get("date_start") or vals.get("attendance_sheet_range"):
+            vals.update(
+                {
+                    "date_end": self.get_date_end(
+                        self.id,
+                        vals.get("attendance_sheet_range"),
+                        vals.get("date_start"),
+                    )
+                }
+            )
+        return super().write(vals)
 
     attendance_week_start = fields.Selection(
         selection=[

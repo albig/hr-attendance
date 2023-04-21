@@ -160,7 +160,11 @@ must be set on the Company %s"
         for company_id in companies:
             if company_id.date_end and datetime.today().date() > company_id.date_end:
                 company_id.date_start = company_id.date_end + relativedelta(days=1)
-                company_id.set_date_end(company_id.id)
+                company_id.date_end = company_id.get_date_end(
+                    company_id.id,
+                    company_id.attendance_sheet_range,
+                    company_id.date_start,
+                )
 
     # Compute Methods
     @api.depends("employee_id", "date_start", "date_end")
